@@ -4,112 +4,160 @@ import websockets
 import pyaudio
 import json
 import time
+import wave
+import contextlib
+
+from .assistant.app import process_item
 
 
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 16000
 CHUNK = 1024
+
+# DEEPGRAM_URL = "wss://api.deepgram.com/v1/listen"
+DEEPGRAM_URL = "ws://localhost:8765" # for local testing
+DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
+
+MAX_TRANSCRIPTION_DURATION_SECONDS = 5
+SILENCE_TIMEOUT_DURATION_SECONDS = 1
 
 
 ws = None
 p = None
-
-DEEPGRAM_URL = "wss://api.deepgram.com/v1/listen?"
-DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
-
-MAX_TRANSCRIPTION_DURATION_SECONDS = 5
-
-FORMAT = pyaudio.paInt16
-CHANNELS = 1
-RATE = 16000
-CHUNK = 1024
+current_transcription_task: asyncio.Task | None = None
 
 # for silence detection
 last_speech_time = time.time()
 is_transcribing = False
-SILENCE_TIMEOUT_DURATION_SECONDS = 1
 
-transcript_buffer = ""
-
-p = pyaudio.PyAudio()
+transcript_buffer = []
 
 
-async def send_audio(ws):
-    global last_speech_time
-    
-    # open audio stream
-    stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
+async def on_message(message: str):
+    global transcript_buffer
 
-    print("🎙️ Started recording")
-    while is_transcribing:
-        data = stream.read(CHUNK, exception_on_overflow=False)
-        
-        # write audio stream chunks to deepgram
-        await ws.send(data)
-
-        # check silence timeout
-        if time.time() - last_speech_time > SILENCE_TIMEOUT_DURATION_SECONDS:
-            print("🛑 No speech detected for", SILENCE_TIMEOUT_DURATION_SECONDS, "seconds")
-            break
-
-    # stop and close the stream
-    stream.stop_stream()
-    stream.close()
-    await ws.close()
-    print("🎤 Audio stream closed")
-
-
-async def receive_transcripts(ws):
-    global last_speech_time, transcript_buffer
-    
-    # receive transcripts from deepgram
-    async for message in ws:
+    try:
         data = json.loads(message)
-        
+
+        # Skip metadata messages
+        if data.get("type") == "Metadata":
+            return
+
+        # Handle actual transcription results
         if "channel" in data and "alternatives" in data["channel"]:
-            alt = data["channel"]["alternatives"][0]
-            transcript = alt.get("transcript", "")
+            transcript = data["channel"]["alternatives"][0].get("transcript", "")
+
             if transcript.strip():
-                last_speech_time = time.time()
-                print("📝 Transcript:", transcript)
-                transcript_buffer += transcript
+                transcript_buffer.append(transcript)
 
-        if data.get("is_final"):
-            print("✅ Final transcript")
-            print("Final Transcript:", transcript_buffer)
+    except json.JSONDecodeError:
+        pass
+    except Exception as e:
+        print(f"Error processing message: {e}")
 
+
+async def message_handler():
+    """Dedicated message handler coroutine"""
+    print("Starting message handler...")
+    try:
+        async for message in ws:
+            print("Received message:", message)
+            await on_message(message)
+    except asyncio.CancelledError:
+        pass  # Expected during shutdown
+    except Exception as e:
+        print(f"Handler error: {e}")
+        
 
 async def start_transcription():
-    global transcribing, last_speech_time
-    transcribing = True
-    last_speech_time = time.time()
+    """Manage both audio streaming and message handling"""
+    global is_transcribing
+    
+    # send MODE_LISTENING to arduino
 
-    # send and recieve audio in async
-    send_task = asyncio.create_task(send_audio(ws))
-    receive_task = asyncio.create_task(receive_transcripts(ws))
+    p = pyaudio.PyAudio()
+    stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
+    
+    # clear the transcript buffer
+    transcript_buffer.clear()
 
-    # or timeout in X seconds
-    timeout_task = asyncio.create_task(asyncio.sleep(MAX_TRANSCRIPTION_DURATION_SECONDS))
+    # handler for messages
+    handler_task = asyncio.create_task(message_handler())
 
-    # whichever finishes first
-    done, pending = await asyncio.wait(
-        [send_task, receive_task, timeout_task],
-        return_when=asyncio.FIRST_COMPLETED,
-    )
+    wav_file = wave.open("recording.wav", "wb")
+    wav_file.setnchannels(CHANNELS)
+    wav_file.setsampwidth(p.get_sample_size(FORMAT))
+    wav_file.setframerate(RATE)
 
-    for task in pending:
-        task.cancel()
-        
-    transcribing = False
+
+    try:
+        is_transcribing = True
+        while is_transcribing:
+            data = stream.read(CHUNK, exception_on_overflow=False)
+            await ws.send(data)
+            wav_file.writeframes(data)
+            await asyncio.sleep(0.01)
+    finally:
+        handler_task.cancel()  # Signal cancellation
+        with contextlib.suppress(asyncio.CancelledError):
+            await handler_task 
+            
+        stream.stop_stream()
+        stream.close()
+        p.terminate()
+        is_transcribing = False
+
+
+async def finish_logging_transcription():
+    pass
+
+
+async def finish_message_transcription():
+    final_string = transcript_buffer.join("")
+    transcript_buffer.clear()
+    print(f"Final transcript: {final_string}")
+    
+    await process_item({
+        "sentence": final_string
+    })
 
 
 async def on_startup():
     global ws, p
-    ws = await websockets.connect(DEEPGRAM_URL + f"access_token={DEEPGRAM_API_KEY}",)
+    headers = {
+        'Authorization': f"Token {DEEPGRAM_API_KEY}"
+    }
+
+    print("🔗 Connecting to Deepgram WebSocket...")
     p = pyaudio.PyAudio()
+    ws = await websockets.connect(
+        DEEPGRAM_URL,
+        additional_headers=headers
+    )
     
 
+async def main():
+    # 1. Establish connection
+    await on_startup()
+    
+    print("✅ Connected to Deepgram WebSocket", ws)
+
+    # 2. Start transcription (which handles messages)
+    await start_transcription()
+
+    # 3. Run until cancelled
+    try:
+        while True:
+            await asyncio.sleep(1)
+    except asyncio.CancelledError:
+        pass
+    finally:
+        await ws.close()
+
+
 if __name__ == "__main__":
-    asyncio.run(on_startup())
-    asyncio.run(start_transcription())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nShutting down...")

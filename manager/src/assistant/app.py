@@ -48,17 +48,12 @@ async def process_item(data):
 
     logger.info(f"Processing sentence: {sentence}")
 
-    # await websocket.send_text("ACCEPTED")
-    
-    
-    
-    pass
-    
+    # send MODE_THINKING to arduino
+
     # classification.classify_sentence(sentence)
     # take in intents w/ their slots
     # query intent name to skill name mapping
     # run skill (function) with slots as kwargs
-
 
 
 # @app.on_event("startup")
