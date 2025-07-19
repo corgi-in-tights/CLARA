@@ -5,6 +5,8 @@ from fastapi import WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.websockets import WebSocketDisconnect
 
+from .intents_store import load_intents_and_samples
+
 app = FastAPI()
 
 logger = logging.getLogger("CLARA-assistant")
@@ -47,3 +49,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
 def process_item(websocket, data):
     pass
+
+
+@app.on_event("startup")
+async def on_startup():
+    await load_intents_and_samples()

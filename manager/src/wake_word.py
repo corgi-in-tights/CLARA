@@ -2,11 +2,12 @@ import pvporcupine
 import pyaudio
 import struct
 import logging
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("CLARA-manager")
 
-porcupine = pvporcupine.create(keywords=["jarvis"])
+porcupine = pvporcupine.create(keyword_paths=["config/clara.ppn"], access_key=os.getenv("PORCUPINE_ACCESS_KEY"))
 
 pa = pyaudio.PyAudio()
 
