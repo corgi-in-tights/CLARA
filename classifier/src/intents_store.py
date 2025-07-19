@@ -56,16 +56,12 @@ if __name__ == "__main__":
     print("Definitions:", json.dumps(intent_definitions[:1], indent=2))
     print("Samples:", json.dumps(intent_samples[:2], indent=2))
     
+    
     df = pd.DataFrame(intent_samples)
 
     # Keep only text and intent columns
     df = df[["text", "intent"]]
 
-    # Map intents to numeric labels
-    label2id = {label: idx for idx, label in enumerate(df["intent"].unique())}
-    df["label"] = df["intent"].map(label2id)
-
     print(df.head())
 
-    # Save to CSV (optional)
     df.to_csv("intent_dataset.csv", index=False)

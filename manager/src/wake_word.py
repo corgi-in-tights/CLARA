@@ -4,6 +4,8 @@ import struct
 import logging
 import os
 
+from .transcription import start_transcription
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("CLARA-manager")
 
@@ -22,6 +24,7 @@ stream = pa.open(
     
 def listen_keyword():
     logger.info("Starting to listen for keyword...")
+    
     try:
         while True:
             pcm = stream.read(porcupine.frame_length, exception_on_overflow=False)
@@ -31,7 +34,8 @@ def listen_keyword():
 
             if keyword_index >= 0:
                 logger.info("Wake word detected!")
-                
+                await start_transcription()
+                # send OLED to turn to 'awake'
 
     except KeyboardInterrupt:
         logger.info("Stopping...")

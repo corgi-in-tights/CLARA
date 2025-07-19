@@ -1,0 +1,40 @@
+text,intent
+Who are my emergency contacts?,emergency_contacts/contact_now
+List my emergency contacts,emergency_contacts/contact_now
+Show me my emergency contacts,emergency_contacts/contact_now
+Do I have any emergency contacts?,emergency_contacts/contact_now
+Emergency contacts list,emergency_contacts/contact_now
+Tell Linda I don't feel safe,emergency_contacts/list
+Contact Dr. Patel immediately,emergency_contacts/list
+Message John saying I'm on my way,emergency_contacts/list
+Alert Sarah,emergency_contacts/list
+Cancel,general/cancel
+Stop,general/cancel
+Shut up,general/cancel
+Never mind,general/cancel
+Forget it,general/cancel
+That's enough,general/cancel
+What are subliminal tablets?,question/internet
+How do black holes evaporate?,question/internet
+Can you tell me about the latest iPhone?,question/internet
+What is your name?,question/about_assistant
+What version are you running?,question/about_assistant
+Do you have a personality?,question/about_assistant
+Start a timer for 30 seconds,check_in_timer/start
+"I'm feeling unwell, check back in with me after 2 hours",check_in_timer/start
+"My head is spinning, can you let Linda know if I'm not better in 15 minutes?",check_in_timer/start
+Cancel the check-in timer,check_in_timer/stop
+Stop the Unwell Check-In Timer,check_in_timer/stop
+"No need to let Linda know in a bit if I feel fine, I feel better now",check_in_timer/stop
+Start logging,logging/start
+I want to log something,logging/start
+Here's how I'm feeling today,logging/start
+Let me tell you about my day,logging/start
+I want to talk about my day,logging/start
+Can I log something?,logging/start
+Stop logging,logging/stop
+That's it for now,logging/stop
+I'm done logging,logging/stop
+End the journal,logging/stop
+We're done here,logging/stop
+Close the log,logging/stop
