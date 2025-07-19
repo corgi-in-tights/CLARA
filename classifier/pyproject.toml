@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "assistant"
+name = "classifier"
 version = "0.1.0"
 description = ""
 authors = ["corgi-in-tights <59304120+corgi-in-tights@users.noreply.github.com>"]
@@ -7,7 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-fastapi = {extras = ["standard"], version = "^0.116.1"}
+pandas = "^2.3.1"
 
 
 [build-system]
