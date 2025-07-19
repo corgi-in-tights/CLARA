@@ -1,163 +1,208 @@
-import os
+import gc
 import asyncio
-import websockets
-import pyaudio
-import json
-import time
-import wave
-import contextlib
+import logging
+import os
 
-from .assistant.app import process_item
+from .assistant.main import process_item
 
+from deepgram import (
+    DeepgramClient,
+    DeepgramClientOptions,
+    LiveTranscriptionEvents,
+    LiveOptions,
+    Microphone,
+)
 
-FORMAT = pyaudio.paInt16
-CHANNELS = 1
-RATE = 16000
-CHUNK = 1024
-
-# DEEPGRAM_URL = "wss://api.deepgram.com/v1/listen"
-DEEPGRAM_URL = "ws://localhost:8765" # for local testing
 DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
 
-MAX_TRANSCRIPTION_DURATION_SECONDS = 5
-SILENCE_TIMEOUT_DURATION_SECONDS = 1
+# Global state
+logger = logging.getLogger("CLARA-speech-to-text")
+logger.setLevel(logging.DEBUG)
+
+# Persistent objects
+transcription_event = None
+transcription_result = None
+cancel_event = None
+dg_connection = None
+microphone = None
+
+# Accumulated interim results
+is_finals = []
 
 
-ws = None
-p = None
-current_transcription_task: asyncio.Task | None = None
-
-# for silence detection
-last_speech_time = time.time()
-is_transcribing = False
-
-transcript_buffer = []
+config = DeepgramClientOptions(options={"keepalive": "true"})
+deepgram = DeepgramClient(DEEPGRAM_API_KEY, config)
+dg_connection = deepgram.listen.asyncwebsocket.v("1")
 
 
-async def on_message(message: str):
-    global transcript_buffer
+@dg_connection.on(LiveTranscriptionEvents.UtteranceEnd)
+async def on_utterance_end(self, *_args, **_kwargs):
+    global transcription_result
+    if is_finals:
+        transcription_result = " ".join(is_finals)
+        logger.debug(f"Utterance End: {transcription_result}")
+        is_finals.clear()
+        
+        if transcription_event:
+            transcription_event.set()
+            
+        await process_item({"sentence": transcription_result})
 
-    try:
-        data = json.loads(message)
+@dg_connection.on(LiveTranscriptionEvents.Open)
+async def on_open(self, open, **kwargs):
+    logger.debug("Connection Open")
 
-        # Skip metadata messages
-        if data.get("type") == "Metadata":
+
+async def setup_deepgram():
+    global dg_connection, microphone
+
+    config = DeepgramClientOptions(options={"keepalive": "true"})
+    deepgram = DeepgramClient(DEEPGRAM_API_KEY, config)
+    dg_connection = deepgram.listen.asyncwebsocket.v("1")
+
+    # Register events
+    async def on_open(self, open, **kwargs):
+        logger.debug("Connection Open")
+
+    async def on_close(self, close, **kwargs):
+        logger.debug("Connection Closed")
+
+    async def on_error(self, error, **kwargs):
+        logger.error(f"Handled Error: {error}")
+
+    async def on_speech_started(self, speech_started, **kwargs):
+        logger.debug("Speech Started")
+
+    async def on_unhandled(self, unhandled, **kwargs):
+        logger.warning(f"Unhandled Websocket Message: {unhandled}")
+
+    dg_connection.on(LiveTranscriptionEvents.Open, on_open)
+    dg_connection.on(LiveTranscriptionEvents.Close, on_close)
+    dg_connection.on(LiveTranscriptionEvents.Error, on_error)
+    dg_connection.on(LiveTranscriptionEvents.SpeechStarted, on_speech_started)
+    dg_connection.on(LiveTranscriptionEvents.Unhandled, on_unhandled)
+
+    async def on_message(self, result, **kwargs):
+        global is_finals, transcription_result
+        if cancel_event and cancel_event.is_set():
             return
 
-        # Handle actual transcription results
-        if "channel" in data and "alternatives" in data["channel"]:
-            transcript = data["channel"]["alternatives"][0].get("transcript", "")
+        sentence = result.channel.alternatives[0].transcript
+        if not sentence:
+            return
 
-            if transcript.strip():
-                transcript_buffer.append(transcript)
+        if result.is_final:
+            is_finals.append(sentence)
 
-    except json.JSONDecodeError:
-        pass
-    except Exception as e:
-        print(f"Error processing message: {e}")
+            if result.speech_final:
+                transcription_result = " ".join(is_finals)
+                logger.debug(f"Speech Final: {transcription_result}")
+                is_finals = []
+                if transcription_event:
+                    transcription_event.set()
 
-
-async def message_handler():
-    """Dedicated message handler coroutine"""
-    print("Starting message handler...")
-    try:
-        async for message in ws:
-            print("Received message:", message)
-            await on_message(message)
-    except asyncio.CancelledError:
-        pass  # Expected during shutdown
-    except Exception as e:
-        print(f"Handler error: {e}")
-        
-
-async def start_transcription():
-    """Manage both audio streaming and message handling"""
-    global is_transcribing
-    
-    # send MODE_LISTENING to arduino
-
-    p = pyaudio.PyAudio()
-    stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
-    
-    # clear the transcript buffer
-    transcript_buffer.clear()
-
-    # handler for messages
-    handler_task = asyncio.create_task(message_handler())
-
-    wav_file = wave.open("recording.wav", "wb")
-    wav_file.setnchannels(CHANNELS)
-    wav_file.setsampwidth(p.get_sample_size(FORMAT))
-    wav_file.setframerate(RATE)
-
-
-    try:
-        is_transcribing = True
-        while is_transcribing:
-            data = stream.read(CHUNK, exception_on_overflow=False)
-            await ws.send(data)
-            wav_file.writeframes(data)
-            await asyncio.sleep(0.01)
-    finally:
-        handler_task.cancel()  # Signal cancellation
-        with contextlib.suppress(asyncio.CancelledError):
-            await handler_task 
+    async def on_utterance_end(self, *_args, **_kwargs):
+        global transcription_result
+        if is_finals:
+            transcription_result = " ".join(is_finals)
+            logger.debug(f"Utterance End: {transcription_result}")
+            is_finals.clear()
             
-        stream.stop_stream()
-        stream.close()
-        p.terminate()
-        is_transcribing = False
+            if transcription_event:
+                transcription_event.set()
+                
+            await process_item({"sentence": transcription_result})
 
+    dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
+    dg_connection.on(LiveTranscriptionEvents.UtteranceEnd, on_utterance_end)
 
-async def finish_logging_transcription():
-    pass
-
-
-async def finish_message_transcription():
-    final_string = transcript_buffer.join("")
-    transcript_buffer.clear()
-    print(f"Final transcript: {final_string}")
-    
-    await process_item({
-        "sentence": final_string
-    })
-
-
-async def on_startup():
-    global ws, p
-    headers = {
-        'Authorization': f"Token {DEEPGRAM_API_KEY}"
-    }
-
-    print("🔗 Connecting to Deepgram WebSocket...")
-    p = pyaudio.PyAudio()
-    ws = await websockets.connect(
-        DEEPGRAM_URL,
-        additional_headers=headers
+    # Start connection
+    options = LiveOptions(
+        model="nova-3",
+        language="en-US",
+        smart_format=True,
+        encoding="linear16",
+        channels=1,
+        sample_rate=16000,
+        interim_results=True,
+        utterance_end_ms="1000",
+        vad_events=True,
+        endpointing=300,
     )
+    addons = {"no_delay": "true"}
+
+    response = await dg_connection.start(options, addons=addons)
     
+    if not response:
+        raise RuntimeError("Failed to connect to Deepgram")
 
-async def main():
-    # 1. Establish connection
-    await on_startup()
+    # Start microphone
+    microphone = Microphone(dg_connection.send)
+
+
+async def transcribe(timeout: float = 5.0) -> str | None:
+    """
+    Starts a new transcription task. Returns final string or None on timeout or cancellation.
+    """
+    microphone.start()
     
-    print("✅ Connected to Deepgram WebSocket", ws)
+    global transcription_event, transcription_result, cancel_event
+    transcription_event = asyncio.Event()
+    cancel_event = asyncio.Event()
+    transcription_result = None
+    logger.info("🎤 Listening...")
 
-    # 2. Start transcription (which handles messages)
-    await start_transcription()
-
-    # 3. Run until cancelled
     try:
-        while True:
-            await asyncio.sleep(1)
-    except asyncio.CancelledError:
-        pass
+        await asyncio.wait_for(transcription_event.wait(), timeout=timeout)
+        return transcription_result
+    except asyncio.TimeoutError:
+        logger.warning("⏱️ Transcription timed out")
+        return None
     finally:
-        await ws.close()
+        if microphone:
+            try:
+                microphone.finish()
+            except Exception as e:
+                logger.warning(f"Error closing microphone: {e}")
+        
+        if transcription_event:
+            transcription_event.clear()
+        if cancel_event:
+            cancel_event.clear()
 
+        logger.debug("🎤 Stopped listening")
+
+def cancel_transcription():
+    """
+    Cancels current transcription attempt.
+    """
+    global cancel_event, transcription_event
+    if cancel_event:
+        cancel_event.set()
+    if transcription_event and not transcription_event.is_set():
+        transcription_event.set()
+    logger.debug("❌ Transcription cancelled")
+
+
+async def shutdown():
+    if microphone:
+        microphone.finish()
+    if dg_connection:
+        await dg_connection.finish()
+
+
+async def run():
+    await setup_deepgram()
+
+    print("Say something...")
+
+    result = await transcribe(timeout=10)
+    if result:
+        print(f"You said: {result}")
+    else:
+        print("No speech detected or timeout.")
+
+    await shutdown()
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("\nShutting down...")
+    asyncio.run(run())

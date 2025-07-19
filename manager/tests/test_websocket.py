@@ -3,7 +3,6 @@ import asyncio
 import websockets
 import json
 import random
-from collections import deque
 
 
 async def mock_deepgram_server(websocket):
@@ -19,7 +18,6 @@ async def mock_deepgram_server(websocket):
         "Microphone input detected",
         "Testing testing 123",
     ]
-    audio_buffer = deque(maxlen=10)  # Store recent audio chunks
 
     try:
         while True:
