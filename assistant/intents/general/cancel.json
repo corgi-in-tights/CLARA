@@ -1,0 +1,12 @@
+{
+    "description": "Cancel the current assistant action or stop it from continuing",
+    "samples": {
+        "Cancel": {},
+        "Stop": {},
+        "Shut up": {},
+        "Never mind": {},
+        "Forget it": {},
+        "That's enough": {}
+    },
+    "slots": {}
+}

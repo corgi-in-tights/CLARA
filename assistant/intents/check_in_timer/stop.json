@@ -1,0 +1,21 @@
+{
+    "description": "Cancel a running check-in timer",
+    "samples": {
+        "Cancel the check-in timer": {
+            "name": "Check-In Timer"
+        },
+        "Stop the Unwell Check-In Timer": {
+            "name": "Unwell Check-In Timer"
+        },
+        "No need to let Linda know in a bit if I feel fine, I feel better now": {
+            "name": "Linda Check-In Timer"
+        }
+    },
+    "slots": {
+        "name": {
+            "type": "string",
+            "optional": true,
+            "description": "The name of the timer to cancel, if blank, cancels all timers"
+        }
+    }
+}

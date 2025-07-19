@@ -1,0 +1,11 @@
+{
+    "description": "List all configured emergency contacts",
+    "samples": {
+        "Who are my emergency contacts?": {},
+        "List my emergency contacts": {},
+        "Show me my emergency contacts": {},
+        "Do I have any emergency contacts?": {},
+        "Emergency contacts list": {}
+    },
+    "slots": {}
+}

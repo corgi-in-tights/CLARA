@@ -1,0 +1,12 @@
+{
+    "description": "Begin a personal log session where the assistant records how the user is doing or what they want to share",
+    "samples": {
+        "Start logging": {},
+        "I want to log something": {},
+        "Here's how I'm feeling today": {},
+        "Let me tell you about my day": {},
+        "I want to talk about my day": {},
+        "Can I log something?": {}
+    },
+    "slots": {}
+}

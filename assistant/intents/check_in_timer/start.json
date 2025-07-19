@@ -1,0 +1,32 @@
+{
+    "description": "Start the check-in timer",
+    "samples": {
+        "Start a timer for 30 seconds": {
+            "duration": 30,
+            "name": "Check-In Timer"
+        },
+        "I'm feeling unwell, check back in with me after 2 hours": {
+            "duration": 7200,
+            "name": "Unwell Check-In Timer"
+        },
+        "My head is spinning, can you let Linda know if I'm not better in 15 minutes?": {
+            "duration": 900,
+            "name": "Linda Check-In Timer"
+        }
+    },
+    "slots": {
+        "duration": {
+            "type": "int",
+            "description": "The duration of the timer in seconds"
+        },
+        "name": {
+            "type": "int",
+            "description": "The name of the timer"
+        },
+        "target": {
+            "type": "string",
+            "optional": true,
+            "description": "The target person to notify when the timer ends"
+        }
+    }
+}

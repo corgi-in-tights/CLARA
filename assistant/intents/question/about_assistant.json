@@ -1,0 +1,20 @@
+{
+    "description": "Ask a question about the assistant or device itself",
+    "samples": {
+        "What is your name?": {
+            "question": "What is your name?"
+        },
+        "What version are you running?": {
+            "question": "What version are you running?"
+        },
+        "Do you have a personality?": {
+            "question": "Do you have a personality?"
+        }
+    },
+    "slots": {
+        "question": {
+            "type": "string",
+            "description": "A question related to the assistant or device"
+        }
+    }
+}

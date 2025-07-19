@@ -1,0 +1,20 @@
+{
+    "description": "Ask a general question that should be looked up online",
+    "samples": {
+        "What are subliminal tablets?": {
+            "question": "What are subliminal tablets?"
+        },
+        "How do black holes evaporate?": {
+            "question": "How do black holes evaporate?"
+        },
+        "Can you tell me about the latest iPhone?": {
+            "question": "Can you tell me about the latest iPhone?"
+        }
+    },
+    "slots": {
+        "question": {
+            "type": "string",
+            "description": "The user's internet-based question"
+        }
+    }
+}
