@@ -10,6 +10,8 @@ from scipy.signal import resample_poly
 
 from .mongo import setup_mongodb
 
+from .assistant.main import setup_classifier_ws
+
 from .arduino import eye
 
 wake_word_detected = asyncio.Event()
@@ -174,7 +176,8 @@ async def main():
     
     
     from .assistant.tts import on_startup as tts_on_startup
-
+    
+    await setup_classifier_ws()
     await setup_mongodb()
     await tts_on_startup()
     

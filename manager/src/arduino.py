@@ -3,7 +3,7 @@ import time
 
 
 class ArduinoEye:
-    def __init__(self, port="/dev/tty.usbmodem11401", baud=115200):
+    def __init__(self, port="/dev/tty.usbmodem1201", baud=115200):
         try:
             self.ser = serial.Serial(port, baud, timeout=1)
             time.sleep(2)

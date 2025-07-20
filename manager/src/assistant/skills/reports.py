@@ -1,14 +1,14 @@
 from datetime import datetime
 from ..responses import send_text_response
 
-from src.mongo import logs_collection
+from src.mongo import get_logs_collection
 
 # Add a transcript log entry
 async def add_to_logs(target_url, sentence, initial_response):
-    if logs_collection is None:
+    if get_logs_collection() is None:
         raise RuntimeError("MongoDB not initialized. Call setup_mongodb() first.")
 
-    send_text_response(target_url, initial_response)
+    await send_text_response(target_url, initial_response)
 
     now = datetime.now()
     date_str = now.strftime("%Y-%m-%d")
@@ -17,6 +17,6 @@ async def add_to_logs(target_url, sentence, initial_response):
     log_entry = {"time": time_str, "transcript": sentence}
 
     # Update the document for today, appending to the log list
-    await logs_collection.update_one({"_id": date_str}, {"$push": {"logs": log_entry}}, upsert=True)
+    await get_logs_collection().update_one({"_id": date_str}, {"$push": {"logs": log_entry}}, upsert=True)
 
     print("Log entry added:", log_entry)

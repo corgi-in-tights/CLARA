@@ -1,30 +1,49 @@
 import json
 import asyncio
 import logging
+import openai
 
 from .intent_mappings import map_intent_to_skill
 import websockets
 
 from ..arduino import eye
 
+openai.api_key = "sk-..."
+
 logger = logging.getLogger("CLARA-assistant")
 logger.setLevel(logging.DEBUG)
 logger.addHandler(logging.StreamHandler())
 
-CLASSIFIER_URL = "ws://localhost:8011/ws"
+CLASSIFIER_URL = "ws://localhost:8099/ws"
 
 ws = None
 
-async def on_startup():
-    logger.info("Assistant startup complete")
+async def setup_classifier_ws():
+    print("Setting up WebSocket connection to classifier...")
     
     global ws
     ws = await websockets.connect(CLASSIFIER_URL)
-    logger.info("WebSocket connection established")
+    print("Classifier WebSocket connection established")
+
+
+# async def get_response(sentence: str) -> str:
+#     try:
+#         response = await openai.ChatCompletion.acreate(
+#             model="gpt-4",
+#             messages=[
+#                 {"role": "system", "content": "Respond to what the user said within 20 words, confirming that you will reply if it is a question "},
+#                 {"role": "user", "content": sentence},
+#             ],
+#             temperature=0.7,
+#             max_tokens=500,
+#         )
+#         return response["choices"][0]["message"]["content"].strip()
+#     except Exception as e:
+#         return f"Error: {e}"
 
 
 async def get_slots_response_from_sentence(sentence, intent_schema):
-    pass
+    return {}, "Sure! I can help with that, let me add it for you."
 
 
 async def classify_sentence(sentence):
@@ -73,11 +92,11 @@ async def process_item(target_url, sentence):
     # sentence = "What is a sublingual tablet?"  # for testing
 
     # get list of intents from the sentence
-    # intent = await classify_sentence(sentence)
-    intent, response = {
-        "intent_name": "question/internet",
-        "slots": {}
-    }, "Okay! Let me just look that up for you."
+    intent, response = await classify_sentence(sentence)
+    # intent, response = {
+    #     "intent_name": "question/internet",
+    #     "slots": {}
+    # }, "Okay! Let me just look that up for you."
 
     if not intent:
         logger.warning("No intent found in sentence")
