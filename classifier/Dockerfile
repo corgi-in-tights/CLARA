@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM --platform=linux/arm64 python:3.10-slim
 
 # Use non-root user (optional but recommended)
 ENV PYTHONDONTWRITEBYTECODE=1

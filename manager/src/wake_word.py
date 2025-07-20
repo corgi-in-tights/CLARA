@@ -6,7 +6,7 @@ import struct
 import logging
 import os
 
-from .transcription import transcribe
+from .assistant.stt import transcribe
 
 logger = logging.getLogger(__name__)
 

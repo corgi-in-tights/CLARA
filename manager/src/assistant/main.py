@@ -5,7 +5,10 @@ import logging
 from .intent_mappings import map_intent_to_skill
 import websockets
 
+from ..arduino import eye
+
 logger = logging.getLogger("CLARA-assistant")
+logger.setLevel(logging.DEBUG)
 logger.addHandler(logging.StreamHandler())
 
 CLASSIFIER_URL = "ws://localhost:8011/ws"
@@ -53,11 +56,10 @@ async def classify_sentence(sentence):
         logger.error(f"WebSocket error: {e}")
         intent_names = []
 
-    # return []
+    return intent_names
 
 
-async def process_item(data):
-    sentence = data.get("sentence", "")
+async def process_item(target_url, sentence):
     if not sentence:
         logger.warning("Received empty sentence")
         return None
@@ -66,24 +68,36 @@ async def process_item(data):
     
     print(f"Processing sentence: {sentence}")
 
+    eye.thinking()
+
+    # sentence = "What is a sublingual tablet?"  # for testing
+
     # get list of intents from the sentence
-    intents = await classify_sentence(sentence)
-    if len(intents) == 0:
-        logger.warning("No intents found in sentence")
+    # intent = await classify_sentence(sentence)
+    intent, response = {
+        "intent_name": "question/internet",
+        "slots": {}
+    }, "Okay! Let me just look that up for you."
+
+    if not intent:
+        logger.warning("No intent found in sentence")
         return None
 
     # query intent name to skill name mapping then run skill
-    for intent in intents:
-        intent_name = intent.get("intent")
-        
-        skill = map_intent_to_skill(intent_name)
-        if not skill:
-            logger.warning("No skill found for intent: %s", intent_name)
-            continue
+    intent_name = intent.get("intent_name")
 
-        # run skill (function) with slots as kwargs
-        try:
-            await skill(**intent.get("slots", {}))
-        except Exception as e:
-            logger.exception("Error occurred while running skill")
-            continue
+    skill = map_intent_to_skill(intent_name)
+    
+    if not skill or not skill[0]:
+        logger.warning("No skill found for intent: %s", intent_name)
+        return None
+    
+    skill_func = skill[0]
+    print(f"Mapped skill func: {skill_func.__name__} for intent: {intent_name}")
+
+    # run skill (function) with slots as kwargs
+    try:
+        logger.info(f"Running skill: {skill_func.__name__} with slots: {intent.get('slots', {})}")
+        await skill_func(target_url, sentence, response, **intent.get("slots", {}))
+    except Exception:
+        logger.exception("Error occurred while running skill")

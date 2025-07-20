@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 
-from .assistant.main import process_item
+from .main import process_item
 
 from deepgram import (
     DeepgramClient,
@@ -62,12 +62,12 @@ async def on_transcript(self, result, **kwargs):
 
     if result.is_final:
         is_finals.append(sentence)
-        # print("TRANSCRIPT", sentence)
+        logger.debug(f"Final transcript: {sentence}")
         
         transcription_result = " ".join(is_finals)
         
-        logger.debug("Dispatching transcription result")
-        asyncio.create_task(process_item({"sentence": transcription_result}))
+        print("Dispatching transcription result")
+        asyncio.create_task(process_item("", transcription_result))
         
         utterence_end_event.set()
 
