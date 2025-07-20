@@ -8,9 +8,7 @@ import os
 
 from .transcription import transcribe
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CLARA-manager")
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 porcupine = pvporcupine.create(keyword_paths=["config/clara-mac.ppn"], access_key=os.getenv("PORCUPINE_ACCESS_KEY"))
 

@@ -1,0 +1,10 @@
+{
+    "description": "Let the user log their feelings or experiences throughout the day, or any medication side-effects.",
+    "samples": {
+        "I haven't been feeling too well, I do not believe the Ritalin is working as intended.": {},
+        "Hey! My stomach is rumbling a bit.": {},
+        "I had a lot of sweets today, will be abstaining from it in the future.": {},
+        "My day was amazing today": {}
+    },
+    "slots": {}
+}
