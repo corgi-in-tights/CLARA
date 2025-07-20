@@ -1,12 +1,10 @@
 FROM --platform=linux/arm64 python:3.10-slim
 
-# Use non-root user (optional but recommended)
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Install system dependencies needed for transformers and PyTorch
 RUN apt-get update && apt-get install -y \
     git \
     build-essential \
@@ -16,11 +14,14 @@ RUN apt-get update && apt-get install -y \
     libxrender-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Create virtual env and set PATH
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
 COPY requirements.txt .
+
 RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
 COPY . .
 
 EXPOSE 8099

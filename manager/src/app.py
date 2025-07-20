@@ -8,7 +8,7 @@ import pvporcupine
 import os
 from scipy.signal import resample_poly
 
-from .assistant.skills.reports import setup_mongodb
+from .mongo import setup_mongodb
 
 from .arduino import eye
 
@@ -63,6 +63,7 @@ def read_audio_stream(pa, stream, **kwargs):
         return downsample_48k_to_16k(audio_chunk_48k)
     return None
 
+
 async def wake_word_listener(wake_word_event, pa, stream, porcupine):
     logger.info("Starting to listen for wake word...")
 
@@ -107,7 +108,6 @@ async def wake_word_listener(wake_word_event, pa, stream, porcupine):
         pa.terminate()
         porcupine.delete()
         logger.debug("Wake word listener stopped and resources released.")
-
 
 
 async def deepgram_transcriber(pa, stream, dg_connection, utterence_end_event):
@@ -175,6 +175,7 @@ async def main():
     
     from .assistant.tts import on_startup as tts_on_startup
 
+    await setup_mongodb()
     await tts_on_startup()
     
     
